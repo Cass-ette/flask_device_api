@@ -3,7 +3,14 @@ from flask import Flask, jsonify, request
 
 app = Flask(__name__)
 
-
+@app.route('/smart-hub/devices', methods=['GET'])
+def get_smart_devices():
+    hub = SmartHomeHub()
+    return jsonify({
+        'devices': [str(device) for device in hub.controller.devices.values()],
+        'total_energy': hub.total_energy_usage()
+    })
+    
 def create_connection():
     conn = sqlite3.connect('devices.db')
     conn.execute('''CREATE TABLE IF NOT EXISTS devices
