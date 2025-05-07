@@ -1,6 +1,10 @@
 # 使用CentOS官方镜像
 FROM centos:7
 
+RUN pip install --upgrade pip
+RUN pip install flask gunicorn
+RUN pip install --user flask gunicorn
+
 # 安装基础依赖
 RUN yum install -y python3 python3-pip && \
     pip3 install --no-cache-dir --upgrade pip
