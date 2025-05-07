@@ -3,7 +3,7 @@ FROM centos:7
 
 RUN pip install --upgrade pip
 RUN pip install flask gunicorn
-RUN pip install --user flask gunicorn
+RUN pip install -i https://pypi.tuna.tsinghua.edu.cn/simple flask
 
 # 安装基础依赖
 RUN yum install -y python3 python3-pip && \
