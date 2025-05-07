@@ -1,7 +1,14 @@
+import os
+app = Flask(__name__)
+app.config['DATABASE'] = '/app/instance/devices.db'
+
+os.makedirs('/app/instance', exist_ok=True)
+
 import sqlite3
 from flask import Flask, jsonify, request
 
 app = Flask(__name__)
+
 
 @app.route('/smart-hub/devices', methods=['GET'])
 def get_smart_devices():
@@ -10,7 +17,8 @@ def get_smart_devices():
         'devices': [str(device) for device in hub.controller.devices.values()],
         'total_energy': hub.total_energy_usage()
     })
-    
+
+
 def create_connection():
     conn = sqlite3.connect('devices.db')
     conn.execute('''CREATE TABLE IF NOT EXISTS devices
@@ -28,7 +36,8 @@ def get_devices():
     cursor.execute('SELECT * FROM devices')
     devices = cursor.fetchall()
     conn.close()
-    result = [{'device_id': device[0], 'name': device[1],'status': device[2], 'energy_usage': device[3]} for device in devices]
+    result = [{'device_id': device[0], 'name': device[1], 'status': device[2], 'energy_usage': device[3]} for device in
+              devices]
     return jsonify(result)
 
 
@@ -40,7 +49,7 @@ def get_device(device_id):
     device = cursor.fetchone()
     conn.close()
     if device:
-        result = {'device_id': device[0], 'name': device[1],'status': device[2], 'energy_usage': device[3]}
+        result = {'device_id': device[0], 'name': device[1], 'status': device[2], 'energy_usage': device[3]}
         return jsonify(result)
     return jsonify({'message': 'Device not found'}), 404
 
@@ -89,7 +98,7 @@ def update_device(device_id):
     values.append(device_id)
 
     if updates:
-        update_query = 'UPDATE devices SET'+ ', '.join(updates) +'WHERE device_id =?'
+        update_query = 'UPDATE devices SET' + ', '.join(updates) + 'WHERE device_id =?'
         try:
             cursor.execute(update_query, tuple(values))
             conn.commit()
