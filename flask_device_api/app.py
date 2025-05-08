@@ -78,7 +78,4 @@ def control_device(device_id, command):
     return jsonify({'message': f'Device {device_id} turned {command}'})
 
 if __name__ == '__main__':
-    # 初始化测试设备
-    hub.controller.add_device(Light('L1', 'Living Room Light'))
-    hub.controller.add_device(Thermostat('T1', 'Living Room Thermostat'))
     app.run(host='0.0.0.0', port=5000)
