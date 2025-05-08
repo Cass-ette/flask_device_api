@@ -1,5 +1,5 @@
 # 使用官方Python镜像（阿里云国内源加速下载）
-FROM registry.cn-hangzhou.aliyuncs.com/library/python:3.9-slim
+FROM python:3.9-slim
 
 # 设置工作目录
 WORKDIR /app
