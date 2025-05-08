@@ -1,112 +1,84 @@
 import sqlite3
+import os
 from flask import Flask, jsonify, request
+from devices import SmartHomeHub
 
 app = Flask(__name__)
+app.config['DATABASE'] = os.path.join(os.getcwd(), 'instance', 'devices.db')
+os.makedirs(os.path.dirname(app.config['DATABASE']), exist_ok=True)
 
+# 初始化智能家居中心
+hub = SmartHomeHub()
 
-def create_connection():
-    conn = sqlite3.connect('devices.db')
+def get_db():
+    conn = sqlite3.connect(app.config['DATABASE'])
     conn.execute('''CREATE TABLE IF NOT EXISTS devices
                     (device_id TEXT PRIMARY KEY,
                     name TEXT NOT NULL,
                     status TEXT NOT NULL,
-                    energy_usage REAL NOT NULL);''')
+                    energy_usage REAL NOT NULL)''')
     return conn
 
-
+# 设备数据库API
 @app.route('/devices', methods=['GET'])
-def get_devices():
-    conn = create_connection()
+def get_all_devices():
+    conn = get_db()
     cursor = conn.cursor()
     cursor.execute('SELECT * FROM devices')
-    devices = cursor.fetchall()
+    devices = [dict(zip(['device_id','name','status','energy_usage'], row)) 
+               for row in cursor.fetchall()]
     conn.close()
-    result = [{'device_id': device[0], 'name': device[1],'status': device[2], 'energy_usage': device[3]} for device in devices]
-    return jsonify(result)
-
+    return jsonify(devices)
 
 @app.route('/devices/<device_id>', methods=['GET'])
 def get_device(device_id):
-    conn = create_connection()
+    conn = get_db()
     cursor = conn.cursor()
-    cursor.execute('SELECT * FROM devices WHERE device_id =?', (device_id,))
+    cursor.execute('SELECT * FROM devices WHERE device_id=?', (device_id,))
     device = cursor.fetchone()
     conn.close()
-    if device:
-        result = {'device_id': device[0], 'name': device[1],'status': device[2], 'energy_usage': device[3]}
-        return jsonify(result)
-    return jsonify({'message': 'Device not found'}), 404
-
+    return jsonify(dict(zip(['device_id','name','status','energy_usage'], device))) if device else ('Not found', 404)
 
 @app.route('/devices', methods=['POST'])
 def add_device():
     data = request.get_json()
-    device_id = data.get('device_id')
-    name = data.get('name')
-    status = data.get('status', 'off')
-    energy_usage = data.get('energy_usage', 0.0)
-
-    conn = create_connection()
+    conn = get_db()
     cursor = conn.cursor()
     try:
-        cursor.execute('INSERT INTO devices (device_id, name, status, energy_usage) VALUES (?,?,?,?)',
-                       (device_id, name, status, energy_usage))
+        cursor.execute('INSERT INTO devices VALUES (?,?,?,?)',
+                      (data['device_id'], data['name'], data.get('status','off'), data.get('energy_usage',0.0)))
         conn.commit()
-        conn.close()
-        return jsonify({'message': 'Device added successfully'})
+        return jsonify({'message': 'Device added'})
     except sqlite3.IntegrityError:
+        return jsonify({'error': 'Device exists'}), 409
+    finally:
         conn.close()
-        return jsonify({'message': 'Device ID already exists'}), 409
 
+# 智能家居控制API
+@app.route('/smart-hub/devices', methods=['GET'])
+def get_smart_devices():
+    return jsonify([{
+        'id': d.get_id(),
+        'name': d.get_name(),
+        'type': d.__class__.__name__,
+        'status': d.get_status()
+    } for d in hub.controller.devices.values()])
 
-@app.route('/devices/<device_id>', methods=['PUT'])
-def update_device(device_id):
-    data = request.get_json()
-    name = data.get('name')
-    status = data.get('status')
-    energy_usage = data.get('energy_usage')
-
-    conn = create_connection()
-    cursor = conn.cursor()
-    updates = []
-    values = []
-    if name:
-        updates.append('name =?')
-        values.append(name)
-    if status:
-        updates.append('status =?')
-        values.append(status)
-    if energy_usage:
-        updates.append('energy_usage =?')
-        values.append(energy_usage)
-    values.append(device_id)
-
-    if updates:
-        update_query = 'UPDATE devices SET'+ ', '.join(updates) +'WHERE device_id =?'
-        try:
-            cursor.execute(update_query, tuple(values))
-            conn.commit()
-            conn.close()
-            return jsonify({'message': 'Device updated successfully'})
-        except sqlite3.Error as e:
-            conn.close()
-            return jsonify({'message': f'Error updating device: {str(e)}'}), 500
-    return jsonify({'message': 'No valid data to update'}), 400
-
-
-@app.route('/devices/<device_id>', methods=['DELETE'])
-def delete_device(device_id):
-    conn = create_connection()
-    cursor = conn.cursor()
-    try:
-        cursor.execute('DELETE FROM devices WHERE device_id =?', (device_id,))
-        conn.commit()
-        conn.close()
-        return jsonify({'message': 'Device deleted successfully'})
-    except sqlite3.Error as e:
-        conn.close()
-        return jsonify({'message': f'Error deleting device: {str(e)}'}), 500
-
+@app.route('/smart-hub/<device_id>/<command>', methods=['POST'])
+def control_device(device_id, command):
+    device = hub.controller.get_device(device_id)
+    if not device:
+        return jsonify({'error': 'Device not found'}), 404
+    if command == 'on':
+        device.turn_on()
+    elif command == 'off':
+        device.turn_off()
+    else:
+        return jsonify({'error': 'Invalid command'}), 400
+    return jsonify({'message': f'Device {device_id} turned {command}'})
 
 if __name__ == '__main__':
-    app.run(debug=True)
+    # 初始化测试设备
+    hub.controller.add_device(Light('L1', 'Living Room Light'))
+    hub.controller.add_device(Thermostat('T1', 'Living Room Thermostat'))
+    app.run(host='0.0.0.0', port=5000)
