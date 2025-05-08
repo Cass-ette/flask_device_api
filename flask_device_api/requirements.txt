@@ -3,3 +3,5 @@ Werkzeug==3.0.1  # Flask 的底层WSGI工具
 Jinja2==3.1.3    # Flask 的模板引擎
 itsdangerous==2.1.2  # Flask 的安全签名库
 click==8.1.7     # Flask 的命令行工具
+gunicorn
+sqlite3
